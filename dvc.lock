@@ -9,8 +9,8 @@ stages:
       size: 91820383
     - path: params.yaml
       hash: md5
-      md5: b0e1db251608683a3951e396e77abca1
-      size: 1149
+      md5: 93f1a1cb5245e18f9d591ce3b417983d
+      size: 2411
     - path: src/config.py
       hash: md5
       md5: a2fa5d3d06bb05c275969e356f8c3ac0
@@ -21,38 +21,38 @@ stages:
       size: 2149
     - path: src/preprocessing.py
       hash: md5
-      md5: 7a93318f48d49d85d643aa921935ccaf
-      size: 3111
+      md5: 9f790a76f1a064190a5530476d2b6254
+      size: 3610
     - path: src/train.py
       hash: md5
-      md5: 73f244c4190a6c3ba8c5db2d7beac222
-      size: 10619
+      md5: 591ee668c93f4dc93bf8f698a02d6802
+      size: 12129
     outs:
     - path: data/processed
       hash: md5
-      md5: 80f284d46e108c7dee72af4320ebd718.dir
-      size: 28818208
+      md5: 9b7bb0d19ae928aadef200dbbf4b061e.dir
+      size: 25631089
       nfiles: 3
   train:
     cmd: python -m src.train --train-only
     deps:
     - path: data/processed
       hash: md5
-      md5: 80f284d46e108c7dee72af4320ebd718.dir
-      size: 28818208
+      md5: 9b7bb0d19ae928aadef200dbbf4b061e.dir
+      size: 25631089
       nfiles: 3
     - path: params.yaml
       hash: md5
-      md5: b0e1db251608683a3951e396e77abca1
-      size: 1149
+      md5: 93f1a1cb5245e18f9d591ce3b417983d
+      size: 2411
     - path: src/evaluation.py
       hash: md5
-      md5: 53c75a129c8572174629bda9f0922041
-      size: 2384
+      md5: 3ae36983a0c9869a6252bce4bcbe486b
+      size: 2475
     - path: src/train.py
       hash: md5
-      md5: 73f244c4190a6c3ba8c5db2d7beac222
-      size: 10619
+      md5: 591ee668c93f4dc93bf8f698a02d6802
+      size: 12129
     - path: src/training_utils.py
       hash: md5
       md5: f87140aaef2e8ad6a3885a687e85aff4
@@ -60,11 +60,11 @@ stages:
     outs:
     - path: models/artifacts
       hash: md5
-      md5: 4d4d6c4ef9c9b6707ccfb6f94676fcd4.dir
-      size: 57333001
+      md5: 6feda9b069cc09131be00c67f3eb5392.dir
+      size: 15265505
       nfiles: 5
     - path: reports/figures
       hash: md5
-      md5: e5a12bf8551a963cc5d20eb99e6f57f4.dir
-      size: 129756
-      nfiles: 4
+      md5: 55f070a1f4f2bfd791a1f6377b2c8126.dir
+      size: 93861
+      nfiles: 7
