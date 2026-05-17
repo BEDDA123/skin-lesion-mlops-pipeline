@@ -1,0 +1,70 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python -m src.train --prepare-only --force-prepare
+    deps:
+    - path: data/raw/hmnist_28_28_RGB.csv
+      hash: md5
+      md5: 49f6b40bcb4be9e46086debd9ab3809b
+      size: 91820383
+    - path: params.yaml
+      hash: md5
+      md5: b0e1db251608683a3951e396e77abca1
+      size: 1149
+    - path: src/config.py
+      hash: md5
+      md5: a2fa5d3d06bb05c275969e356f8c3ac0
+      size: 607
+    - path: src/ingestion.py
+      hash: md5
+      md5: ff5f78fe75e6f08493d9f9b358b7df08
+      size: 2149
+    - path: src/preprocessing.py
+      hash: md5
+      md5: 7a93318f48d49d85d643aa921935ccaf
+      size: 3111
+    - path: src/train.py
+      hash: md5
+      md5: 73f244c4190a6c3ba8c5db2d7beac222
+      size: 10619
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 80f284d46e108c7dee72af4320ebd718.dir
+      size: 28818208
+      nfiles: 3
+  train:
+    cmd: python -m src.train --train-only
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 80f284d46e108c7dee72af4320ebd718.dir
+      size: 28818208
+      nfiles: 3
+    - path: params.yaml
+      hash: md5
+      md5: b0e1db251608683a3951e396e77abca1
+      size: 1149
+    - path: src/evaluation.py
+      hash: md5
+      md5: 53c75a129c8572174629bda9f0922041
+      size: 2384
+    - path: src/train.py
+      hash: md5
+      md5: 73f244c4190a6c3ba8c5db2d7beac222
+      size: 10619
+    - path: src/training_utils.py
+      hash: md5
+      md5: f87140aaef2e8ad6a3885a687e85aff4
+      size: 724
+    outs:
+    - path: models/artifacts
+      hash: md5
+      md5: 4d4d6c4ef9c9b6707ccfb6f94676fcd4.dir
+      size: 57333001
+      nfiles: 5
+    - path: reports/figures
+      hash: md5
+      md5: e5a12bf8551a963cc5d20eb99e6f57f4.dir
+      size: 129756
+      nfiles: 4

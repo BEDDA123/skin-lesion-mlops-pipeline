@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+ENV/
+.env
+*.egg-info/
+dist/
+build/
+
+# ML / experiments
+mlruns/
+models/artifacts/*
+!models/artifacts/.gitkeep
+reports/figures/*
+!reports/figures/.gitkeep
+reports/logs/*
+!reports/logs/.gitkeep
+*.pkl
+*.joblib
+*.h5
+.DS_Store
+
+# DVC — conserver dvc.yaml, dvc.lock et les fichiers *.dvc versionnés
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (large) — place CSV locally; DVC tracks via dvc add
+data/raw/*.csv
+!data/raw/.gitkeep
