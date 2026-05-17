@@ -1,0 +1,4 @@
+{
+  "model_name": "xgboost",
+  "val_f1_macro": 0.6201363407302738
+}

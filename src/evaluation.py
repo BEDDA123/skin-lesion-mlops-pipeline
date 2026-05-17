@@ -4,7 +4,8 @@ import logging
 from pathlib import Path
 
 import matplotlib
-matplotlib.use('Agg')  # Use non-GUI backend to prevent tkinter errors
+
+matplotlib.use("Agg")  # Use non-GUI backend to prevent tkinter errors
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import (
@@ -46,7 +47,9 @@ def classification_report_dict(y_true, y_pred, label_encoder: LabelEncoder | Non
     names = None
     if label_encoder is not None:
         names = [str(c) for c in label_encoder.classes_]
-    rep = classification_report(y_true, y_pred, target_names=names, output_dict=True, zero_division=0)
+    rep = classification_report(
+        y_true, y_pred, target_names=names, output_dict=True, zero_division=0
+    )
     return _to_json_serializable(rep)
 
 

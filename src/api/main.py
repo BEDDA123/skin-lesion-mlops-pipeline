@@ -4,7 +4,6 @@ import contextlib
 import json
 import logging
 import time
-from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -14,8 +13,6 @@ from src.config import ROOT, load_params
 from src.inference import (
     indices_to_labels,
     load_best_model,
-    map_internal_to_api,
-    map_probabilities_to_api,
     predict_batch,
 )
 from src.monitoring.metrics import log_prediction_batch
@@ -66,7 +63,9 @@ app = FastAPI(
 class PredictRequest(BaseModel):
     """Vecteur aplati des pixels (valeurs 0–255 ou déjà normalisées 0–1)."""
 
-    pixels: list[float] = Field(..., description="Liste de longueur n_pixels (ex. 2352 pour 28x28x3)")
+    pixels: list[float] = Field(
+        ..., description="Liste de longueur n_pixels (ex. 2352 pour 28x28x3)"
+    )
     normalize: bool = True
 
 
@@ -122,4 +121,8 @@ def metrics_summary():
     if not files:
         return {"message": "Aucun log encore."}
     lines = files[-1].read_text(encoding="utf-8").strip().splitlines()
-    return {"file": str(files[-1]), "n_lines": len(lines), "last": json.loads(lines[-1]) if lines else None}
+    return {
+        "file": str(files[-1]),
+        "n_lines": len(lines),
+        "last": json.loads(lines[-1]) if lines else None,
+    }

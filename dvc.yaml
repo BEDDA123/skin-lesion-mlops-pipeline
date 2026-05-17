@@ -1,0 +1,24 @@
+stages:
+  prepare:
+    cmd: python -m src.train --prepare-only --force-prepare
+    deps:
+      - params.yaml
+      - src/config.py
+      - src/ingestion.py
+      - src/preprocessing.py
+      - src/train.py
+      - data/raw/hmnist_28_28_RGB.csv
+    outs:
+      - data/processed
+
+  train:
+    cmd: python -m src.train --train-only
+    deps:
+      - params.yaml
+      - src/evaluation.py
+      - src/train.py
+      - src/training_utils.py
+      - data/processed
+    outs:
+      - models/artifacts
+      - reports/figures

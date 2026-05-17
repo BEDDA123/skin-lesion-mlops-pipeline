@@ -50,7 +50,9 @@ def validate_dataset(df: pd.DataFrame, label_col: str = "label") -> dict:
     return summary
 
 
-def split_features_labels(df: pd.DataFrame, label_col: str = "label") -> tuple[np.ndarray, np.ndarray]:
+def split_features_labels(
+    df: pd.DataFrame, label_col: str = "label"
+) -> tuple[np.ndarray, np.ndarray]:
     """Sépare X (float32) et y (int ou str selon CSV)."""
     y = df[label_col].to_numpy()
     X = df.drop(columns=[label_col]).to_numpy(dtype=np.float32)
@@ -58,5 +60,7 @@ def split_features_labels(df: pd.DataFrame, label_col: str = "label") -> tuple[n
 
 
 def log_dataset_stats(summary: dict) -> None:
-    logger.info("Statistiques dataset: %s lignes, %s features", summary["n_rows"], summary["n_features"])
+    logger.info(
+        "Statistiques dataset: %s lignes, %s features", summary["n_rows"], summary["n_features"]
+    )
     logger.info("Distribution des labels: %s", summary["label_counts"])

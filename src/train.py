@@ -7,7 +7,8 @@ import tempfile
 from pathlib import Path
 
 import matplotlib
-matplotlib.use('Agg')  # Use non-GUI backend to prevent tkinter errors
+
+matplotlib.use("Agg")  # Use non-GUI backend to prevent tkinter errors
 
 import joblib
 import mlflow
@@ -130,11 +131,17 @@ def train_all(processed_dir: Path | None = None) -> dict:
     best_f1 = -1.0
 
     class_weights = _build_class_weights(y_train, params)
-    logger.info("Poids de classes (stratégie=%s): %s", params.get("imbalance", {}).get("strategy", "balanced_minority"), class_weights)
-    
+    logger.info(
+        "Poids de classes (stratégie=%s): %s",
+        params.get("imbalance", {}).get("strategy", "balanced_minority"),
+        class_weights,
+    )
+
     weight_analysis = analyze_class_weights(class_weights)
-    logger.info(f"Analyse des poids: min={weight_analysis['min_weight']:.4f}, max={weight_analysis['max_weight']:.4f}, ratio={weight_analysis['weight_ratio']:.2f}x")
-    
+    logger.info(
+        f"Analyse des poids: min={weight_analysis['min_weight']:.4f}, max={weight_analysis['max_weight']:.4f}, ratio={weight_analysis['weight_ratio']:.2f}x"
+    )
+
     _save_class_weights_artifact(class_weights, artifacts_dir)
 
     model_names = ["logistic_regression", "random_forest", "xgboost"]
@@ -146,7 +153,9 @@ def train_all(processed_dir: Path | None = None) -> dict:
                     "model": model_name,
                     "n_classes": n_classes,
                     "n_features": n_features,
-                    "imbalance_strategy": params.get("imbalance", {}).get("strategy", "balanced_minority"),
+                    "imbalance_strategy": params.get("imbalance", {}).get(
+                        "strategy", "balanced_minority"
+                    ),
                     "rare_class_boost": params.get("imbalance", {}).get("rare_class_boost", 1.5),
                 }
             )
@@ -176,21 +185,33 @@ def train_all(processed_dir: Path | None = None) -> dict:
             mlflow.log_artifact(cm_path)
 
             rep = classification_report_dict(y_test, test_pred, le)
-            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as tfh:
+            with tempfile.NamedTemporaryFile(
+                "w", suffix=".json", delete=False, encoding="utf-8"
+            ) as tfh:
                 json.dump(rep, tfh, indent=2)
                 tmp_name = tfh.name
             mlflow.log_artifact(tmp_name, artifact_path="reports")
             Path(tmp_name).unlink(missing_ok=True)
-            
+
             # Diagnostic détaillé
             try:
                 diagnostic = run_full_diagnostic(
-                    model, X_val, y_val, X_test, y_test, X_train, y_train,
+                    model,
+                    X_val,
+                    y_val,
+                    X_test,
+                    y_test,
+                    X_train,
+                    y_train,
                     label_encoder=le,
-                    output_path=reports_dir / f"diagnostic_{model_name}.json"
+                    output_path=reports_dir / f"diagnostic_{model_name}.json",
                 )
-                mlflow.log_artifact(reports_dir / f"diagnostic_{model_name}.json", artifact_path="diagnostics")
-                logger.info(f"Diagnostic for {model_name}: entropy_ratio={diagnostic['test_entropy'].get('entropy_ratio_mean', 'N/A'):.3f}")
+                mlflow.log_artifact(
+                    reports_dir / f"diagnostic_{model_name}.json", artifact_path="diagnostics"
+                )
+                logger.info(
+                    f"Diagnostic for {model_name}: entropy_ratio={diagnostic['test_entropy'].get('entropy_ratio_mean', 'N/A'):.3f}"
+                )
             except Exception as e:
                 logger.warning(f"Diagnostic failed for {model_name}: {e}")
 
@@ -222,7 +243,7 @@ def train_all(processed_dir: Path | None = None) -> dict:
 def _build_class_weights(y_train: np.ndarray, params: dict) -> dict[int, float]:
     imb = params.get("imbalance", {})
     strategy = imb.get("strategy", "balanced_minority")
-    
+
     if strategy == "balanced_minority":
         return compute_balanced_class_weights(
             y_train,
@@ -237,11 +258,13 @@ def _build_class_weights(y_train: np.ndarray, params: dict) -> dict[int, float]:
         )
 
 
-def _fit_sklearn(name: str, X_train, y_train, X_val, y_val, params: dict, class_weights: dict[int, float]):
+def _fit_sklearn(
+    name: str, X_train, y_train, X_val, y_val, params: dict, class_weights: dict[int, float]
+):
     t = params["train"]
     sw = sample_weights_from_class_dict(y_train, class_weights)
     seed = int(params["data"]["random_seed"])
-    
+
     if name == "logistic_regression":
         model = LogisticRegression(
             max_iter=1000,
@@ -291,10 +314,18 @@ def _save_class_weights_artifact(class_weights: dict[int, float], artifacts_dir:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Préparation des données et entraînement des modèles.")
-    parser.add_argument("--prepare-only", action="store_true", help="Exécute uniquement la préparation.")
-    parser.add_argument("--train-only", action="store_true", help="Exécute uniquement l'entraînement.")
-    parser.add_argument("--force-prepare", action="store_true", help="Recalcule le preprocessing même si présent.")
+    parser = argparse.ArgumentParser(
+        description="Préparation des données et entraînement des modèles."
+    )
+    parser.add_argument(
+        "--prepare-only", action="store_true", help="Exécute uniquement la préparation."
+    )
+    parser.add_argument(
+        "--train-only", action="store_true", help="Exécute uniquement l'entraînement."
+    )
+    parser.add_argument(
+        "--force-prepare", action="store_true", help="Recalcule le preprocessing même si présent."
+    )
     args = parser.parse_args()
 
     if not args.train_only:

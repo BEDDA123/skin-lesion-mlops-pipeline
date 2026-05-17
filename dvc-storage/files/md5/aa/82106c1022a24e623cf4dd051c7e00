@@ -1,0 +1,128 @@
+{
+  "timestamp": "2026-05-17T15:29:25.112617",
+  "dataset_distribution": {
+    "train_distribution": {
+      "0": 769,
+      "1": 4693,
+      "2": 779
+    },
+    "val_distribution": {
+      "0": 165,
+      "1": 1006,
+      "2": 167
+    },
+    "test_distribution": {
+      "0": 165,
+      "1": 1006,
+      "2": 167
+    },
+    "imbalance_ratio": 6.102730819245774,
+    "n_train": 6241,
+    "n_val": 1338,
+    "n_test": 1338
+  },
+  "validation_entropy": {
+    "entropy_mean": 0.6562694311141968,
+    "entropy_median": 0.696447491645813,
+    "entropy_std": 0.2798098027706146,
+    "entropy_max": 1.0985214710235596,
+    "max_proba_mean": 0.7255480885505676,
+    "max_proba_min": 0.33963873982429504,
+    "max_proba_median": 0.7422534227371216,
+    "log_n_classes": 1.0986122886681098,
+    "entropy_ratio_mean": 0.5973621794362209,
+    "n_high_entropy_predictions": 353
+  },
+  "test_entropy": {
+    "entropy_mean": 0.6475773453712463,
+    "entropy_median": 0.6740875840187073,
+    "entropy_std": 0.2758113145828247,
+    "entropy_max": 1.0974459648132324,
+    "max_proba_mean": 0.7307029962539673,
+    "max_proba_min": 0.3488439917564392,
+    "max_proba_median": 0.7593594789505005,
+    "log_n_classes": 1.0986122886681098,
+    "entropy_ratio_mean": 0.5894503020317836,
+    "n_high_entropy_predictions": 330
+  },
+  "val_per_class_metrics": {
+    "0": {
+      "support": 165,
+      "precision": 0.29605263157894735,
+      "recall": 0.5454545454545454,
+      "f1": 0.3837953091684435,
+      "entropy_mean": 0.7735252380371094,
+      "max_proba_mean": 0.6626195907592773
+    },
+    "1": {
+      "support": 1006,
+      "precision": 0.918809201623816,
+      "recall": 0.6749502982107356,
+      "f1": 0.7782234957020058,
+      "entropy_mean": 0.6213544607162476,
+      "max_proba_mean": 0.7457181811332703
+    },
+    "2": {
+      "support": 167,
+      "precision": 0.26440677966101694,
+      "recall": 0.46706586826347307,
+      "f1": 0.33766233766233766,
+      "entropy_mean": 0.7507434487342834,
+      "max_proba_mean": 0.6662193536758423
+    }
+  },
+  "test_per_class_metrics": {
+    "0": {
+      "support": 165,
+      "precision": 0.363013698630137,
+      "recall": 0.6424242424242425,
+      "f1": 0.4638949671772429,
+      "entropy_mean": 0.7290341258049011,
+      "max_proba_mean": 0.6920719742774963
+    },
+    "1": {
+      "support": 1006,
+      "precision": 0.926530612244898,
+      "recall": 0.6769383697813122,
+      "f1": 0.7823090178058587,
+      "entropy_mean": 0.61090087890625,
+      "max_proba_mean": 0.7521653771400452
+    },
+    "2": {
+      "support": 167,
+      "precision": 0.2958199356913183,
+      "recall": 0.5508982035928144,
+      "f1": 0.38493723849372385,
+      "entropy_mean": 0.7880334854125977,
+      "max_proba_mean": 0.6395829319953918
+    }
+  },
+  "test_confusion_analysis": {
+    "top_confusions": {
+      "0->2": {
+        "count": 38,
+        "percentage": 23.03030303030303
+      },
+      "0->1": {
+        "count": 21,
+        "percentage": 12.727272727272727
+      },
+      "1->2": {
+        "count": 181,
+        "percentage": 17.992047713717692
+      },
+      "1->0": {
+        "count": 144,
+        "percentage": 14.314115308151093
+      },
+      "2->0": {
+        "count": 42,
+        "percentage": 25.149700598802394
+      },
+      "2->1": {
+        "count": 33,
+        "percentage": 19.760479041916167
+      }
+    }
+  }
+}

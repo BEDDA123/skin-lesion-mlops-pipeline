@@ -1,0 +1,30 @@
+{
+  "summary": {
+    "n_rows": 8917,
+    "n_features": 2352,
+    "label_col": "label",
+    "n_missing_values": 0,
+    "missing_per_column_top": {},
+    "label_counts": {
+      "2": 1099,
+      "4": 6705,
+      "6": 1113
+    },
+    "dtypes": {
+      "label": "int64",
+      "pixels": "numeric"
+    }
+  },
+  "imbalance_method": "none",
+  "imbalance": {
+    "strategy": "balanced_minority",
+    "rare_class_boost": 1.2,
+    "rare_classes": [
+      0,
+      2
+    ]
+  },
+  "n_train": 6241,
+  "n_val": 1338,
+  "n_test": 1338
+}

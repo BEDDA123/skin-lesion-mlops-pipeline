@@ -26,8 +26,10 @@ def test_predict_when_model_present():
     mock_encoder.classes_ = np.array(["0", "1", "2"])
 
     # Patch the global variables directly instead of triggering startup
-    with patch("src.api.main._model", mock_model), \
-         patch("src.api.main._label_encoder", mock_encoder):
+    with (
+        patch("src.api.main._model", mock_model),
+        patch("src.api.main._label_encoder", mock_encoder),
+    ):
         client = TestClient(app)
         vec = [float(x) for x in range(2352)]
         r = client.post("/predict", json={"pixels": vec, "normalize": False})

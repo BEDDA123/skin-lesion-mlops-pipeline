@@ -1,0 +1,27 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SKIN_CSV_PATH=${SKIN_CSV_PATH:-data/raw/hmnist_filtered.csv}
+      - FAST_TRAIN=${FAST_TRAIN:-0}
+    volumes:
+      - ./data:/app/data
+      - ./models/artifacts:/app/models/artifacts
+      - ./reports:/app/reports
+      - ./mlruns:/app/mlruns
+      - ./params.yaml:/app/params.yaml:ro
+
+  mlflow-ui:
+    image: python:3.11-slim
+    working_dir: /app
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    command: >
+      bash -c "pip install --no-cache-dir 'mlflow>=2.10,<3' &&
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri file:///app/mlruns
+      --default-artifact-root file:///app/mlruns"
