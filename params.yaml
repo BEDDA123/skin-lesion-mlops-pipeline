@@ -53,6 +53,8 @@ train:
 mlflow:
   experiment_name: skin_lesion_3class
   tracking_uri: file:./mlruns
+  enable_model_registry: false  # Set to true to enable automatic model registration
+  model_registry_name: skin_lesion_classifier  # Name for registered model in MLflow Model Registry
 
 api:
   host: 0.0.0.0

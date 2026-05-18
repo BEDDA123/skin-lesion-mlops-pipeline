@@ -32,6 +32,16 @@ from src.evaluation import (
     save_confusion_matrix_png,
 )
 from src.ingestion import load_csv, log_dataset_stats, split_features_labels, validate_dataset
+from src.mlflow_utils import (
+    log_class_weights,
+    log_evaluation_artifacts,
+    log_hyperparameters,
+    log_metrics,
+    log_model_artifacts,
+    log_training_summary,
+    register_best_model,
+    setup_mlflow_experiment,
+)
 from src.preprocessing import (
     apply_imbalance_method,
     encode_labels,
@@ -118,8 +128,12 @@ def train_all(processed_dir: Path | None = None) -> dict:
     )
 
     n_features = int(X_train.shape[1])
-    mlflow.set_tracking_uri(params["mlflow"]["tracking_uri"])
-    mlflow.set_experiment(params["mlflow"]["experiment_name"])
+    
+    # Setup MLflow experiment
+    setup_mlflow_experiment(
+        experiment_name=params["mlflow"]["experiment_name"],
+        tracking_uri=params["mlflow"]["tracking_uri"]
+    )
 
     artifacts_dir = ROOT / "models" / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -145,53 +159,67 @@ def train_all(processed_dir: Path | None = None) -> dict:
     _save_class_weights_artifact(class_weights, artifacts_dir)
 
     model_names = ["logistic_regression", "random_forest", "xgboost"]
+    run_ids = {}  # Store run IDs for model registration
 
     for model_name in model_names:
-        with mlflow.start_run(run_name=model_name, nested=False):
-            mlflow.log_params(
-                {
-                    "model": model_name,
-                    "n_classes": n_classes,
-                    "n_features": n_features,
-                    "imbalance_strategy": params.get("imbalance", {}).get(
-                        "strategy", "balanced_minority"
-                    ),
-                    "rare_class_boost": params.get("imbalance", {}).get("rare_class_boost", 1.5),
-                }
-            )
+        with mlflow.start_run(run_name=model_name, nested=False) as run:
+            run_id = run.info.run_id
+            run_ids[model_name] = run_id
+            
+            # Log hyperparameters using new utility
+            model_params = _get_model_params(model_name, params)
+            log_hyperparameters(params, model_name, model_params)
+            
+            # Log params.yaml as artifact
             mlflow.log_artifact(ROOT / "params.yaml")
 
+            # Training time tracking
+            import time
+            training_start = time.time()
+            
             model = _fit_sklearn(model_name, X_train, y_train, X_val, y_val, params, class_weights)
+            
+            training_time = time.time() - training_start
 
+            # Predictions
             val_pred = model.predict(X_val)
             test_pred = model.predict(X_test)
+            test_proba = model.predict_proba(X_test) if hasattr(model, "predict_proba") else None
+            
+            # Save model artifacts
             if model_name == "logistic_regression":
                 joblib.dump(model, artifacts_dir / "logreg.joblib")
             elif model_name == "random_forest":
                 joblib.dump(model, artifacts_dir / "rf.joblib")
             elif model_name == "xgboost":
                 joblib.dump(model, artifacts_dir / "xgb.joblib")
-            mlflow.sklearn.log_model(model, artifact_path="model")
+            
+            # Log model artifacts using new utility
+            log_model_artifacts(model, model_name, artifacts_dir)
 
+            # Log metrics using new utility
             val_metrics = compute_metrics(y_val, val_pred)
             test_metrics = compute_metrics(y_test, test_pred)
-            for k, v in val_metrics.items():
-                mlflow.log_metric(f"val_{k}", v)
-            for k, v in test_metrics.items():
-                mlflow.log_metric(f"test_{k}", v)
+            log_metrics(val_metrics, prefix="val_")
+            log_metrics(test_metrics, prefix="test_")
 
+            # Log training time
+            mlflow.log_metric("training_time_seconds", training_time)
+
+            # Generate and log evaluation artifacts
             cm_path = reports_dir / f"confusion_{model_name}_test.png"
             save_confusion_matrix_png(y_test, test_pred, cm_path, le)
-            mlflow.log_artifact(cm_path)
-
+            
+            # Save classification report
             rep = classification_report_dict(y_test, test_pred, le)
-            with tempfile.NamedTemporaryFile(
-                "w", suffix=".json", delete=False, encoding="utf-8"
-            ) as tfh:
-                json.dump(rep, tfh, indent=2)
-                tmp_name = tfh.name
-            mlflow.log_artifact(tmp_name, artifact_path="reports")
-            Path(tmp_name).unlink(missing_ok=True)
+            report_path = reports_dir / f"classification_report_{model_name}.json"
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(rep, f, indent=2)
+            
+            # Log all evaluation artifacts (ROC curves, confusion matrix, etc.)
+            log_evaluation_artifacts(
+                reports_dir, model_name, y_test, test_pred, test_proba, le
+            )
 
             # Diagnostic détaillé
             try:
@@ -206,24 +234,26 @@ def train_all(processed_dir: Path | None = None) -> dict:
                     label_encoder=le,
                     output_path=reports_dir / f"diagnostic_{model_name}.json",
                 )
-                mlflow.log_artifact(
-                    reports_dir / f"diagnostic_{model_name}.json", artifact_path="diagnostics"
-                )
                 logger.info(
                     f"Diagnostic for {model_name}: entropy_ratio={diagnostic['test_entropy'].get('entropy_ratio_mean', 'N/A'):.3f}"
                 )
             except Exception as e:
-                logger.warning(f"Diagnostic failed for {model_name}: {e}")
+                logger.warning(f"Diagnostic échoué pour {model_name}: {e}")
 
-            row = {
-                "model": model_name,
-                **{f"val_{k}": v for k, v in val_metrics.items()},
-                **{f"test_{k}": v for k, v in test_metrics.items()},
-            }
-            results_rows.append(row)
+            # Log class weights
+            log_class_weights(class_weights, artifacts_dir)
 
-            if val_metrics["f1_macro"] > best_f1:
-                best_f1 = val_metrics["f1_macro"]
+            results_rows.append(
+                {
+                    "model": model_name,
+                    "val_f1_macro": val_metrics["f1_macro"],
+                    "test_f1_macro": test_metrics["f1_macro"],
+                    "test_accuracy": test_metrics["accuracy"],
+                }
+            )
+
+            if test_metrics["f1_macro"] > best_f1:
+                best_f1 = test_metrics["f1_macro"]
                 best_name = model_name
 
     assert best_name is not None
@@ -237,6 +267,23 @@ def train_all(processed_dir: Path | None = None) -> dict:
         mlflow.log_artifact(reports_dir / "model_comparison.csv")
 
     logger.info("Meilleur modèle (F1 macro validation): %s", best_name)
+    
+    # Register best model in MLflow Model Registry if enabled
+    if params.get("mlflow", {}).get("enable_model_registry", False):
+        try:
+            best_run_id = run_ids.get(best_name)
+            if best_run_id:
+                model_registry_name = params.get("mlflow", {}).get("model_registry_name", "skin_lesion_classifier")
+                register_best_model(
+                    run_id=best_run_id,
+                    model_name=model_registry_name,
+                    metric_name="test_f1_macro",
+                    stage="Production"
+                )
+                logger.info(f"Best model registered in MLflow Model Registry: {model_registry_name}")
+        except Exception as e:
+            logger.warning(f"Failed to register model in MLflow Model Registry: {e}")
+    
     return {"best_model": best_name, "comparison_csv": str(reports_dir / "model_comparison.csv")}
 
 
@@ -311,6 +358,36 @@ def _fit_sklearn(
 def _save_class_weights_artifact(class_weights: dict[int, float], artifacts_dir: Path) -> None:
     with open(artifacts_dir / "class_weights.json", "w", encoding="utf-8") as f:
         json.dump({str(k): v for k, v in class_weights.items()}, f, indent=2)
+
+
+def _get_model_params(model_name: str, params: dict) -> dict:
+    """Extract model-specific hyperparameters for MLflow logging."""
+    t = params["train"]
+    
+    if model_name == "logistic_regression":
+        return {
+            "C": float(t["logistic"]["C"]),
+            "max_iter": int(t["logistic"]["max_iter"]),
+            "solver": "saga",
+        }
+    elif model_name == "random_forest":
+        return {
+            "n_estimators": int(t["rf"]["n_estimators"]),
+            "max_depth": t["rf"].get("max_depth", 15),
+            "min_samples_leaf": int(t["rf"].get("min_samples_leaf", 2)),
+            "min_samples_split": int(t["rf"].get("min_samples_split", 5)),
+        }
+    elif model_name == "xgboost":
+        return {
+            "n_estimators": int(t["xgb"]["n_estimators"]),
+            "max_depth": int(t["xgb"]["max_depth"]),
+            "learning_rate": float(t["xgb"]["learning_rate"]),
+            "subsample": float(t["xgb"]["subsample"]),
+            "colsample_bytree": float(t["xgb"]["colsample_bytree"]),
+            "reg_alpha": float(t["xgb"].get("reg_alpha", 0.1)),
+            "reg_lambda": float(t["xgb"].get("reg_lambda", 1.0)),
+        }
+    return {}
 
 
 def main() -> None:
