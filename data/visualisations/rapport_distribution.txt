@@ -1,0 +1,20 @@
+Rapport de transformation HAM10000 en 3 classes
+---------------------------------------------
+Distribution avant prétraitement:
+  Classe 0: 327
+  Classe 1: 514
+  Classe 2: 1099
+  Classe 3: 115
+  Classe 4: 6705
+  Classe 5: 142
+  Classe 6: 1113
+
+Distribution après prétraitement:
+  Classe 0: 6705
+  Classe 1: 1099
+  Classe 2: 1627
+
+Nombre de classes avant prétraitement: 7
+Nombre de classes après prétraitement: 3
+Remappage appliqué: 4->0, 2->1, 1->2, 6->2
+Classes supprimées: 0, 3, 5

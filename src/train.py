@@ -51,6 +51,7 @@ from src.preprocessing import (
     encode_labels,
     load_processed,
     normalize_pixels,
+    normalize_pixels_advanced,
     save_processed,
     stratified_splits,
 )
@@ -64,16 +65,26 @@ def run_prepare(force: bool = False) -> Path:
     params = load_params()
     raw_path = resolve_raw_csv(params)
     processed_dir = ROOT / params["data"]["processed_dir"]
+    dataset_file = processed_dir / "dataset.npz"
 
-    if (processed_dir / "dataset.npz").is_file() and not force:
-        logger.info("Données déjà préparées: %s", processed_dir)
-        return processed_dir
+    if dataset_file.is_file() and not force:
+        raw_mtime = raw_path.stat().st_mtime
+        processed_mtime = dataset_file.stat().st_mtime
+        if raw_mtime <= processed_mtime:
+            logger.info("Données déjà préparées: %s", processed_dir)
+            return processed_dir
+        logger.warning(
+            "Le fichier source raw est plus récent que le dataset preprocessé. "
+            "Régénération du preprocessing..."
+        )
 
     df = load_csv(raw_path)
     summary = validate_dataset(df)
     log_dataset_stats(summary)
 
     X, y = split_features_labels(df)
+    
+    # Normalisation simple initiale
     X = normalize_pixels(X, max_val=params["preprocess"]["normalize_max"])
     y_enc, le = encode_labels(y)
 
@@ -87,21 +98,40 @@ def run_prepare(force: bool = False) -> Path:
         random_state=seed,
     )
 
-    X_tr, y_tr = apply_imbalance_method(X_train, y_train)
+    # Normalisation avancée
+    norm_method = params["preprocess"].get("normalization_method", "standard")
+    X_train, X_val, X_test, scaler = normalize_pixels_advanced(
+        X_train, X_val, X_test, method=norm_method
+    )
+
+    logger.info("Nombre de features avant preprocessing: %d", X.shape[1])
+    logger.info("Nombre de features après preprocessing: %d", X_train.shape[1])
+
+    # Gestion du déséquilibre
+    imb_method = params["preprocess"].get("imbalance_method", "none")
+    smote_strategy = params["preprocess"].get("smote_strategy", "auto")
+    X_tr, y_tr = apply_imbalance_method(
+        X_train, y_train, 
+        method=imb_method,
+        sampling_strategy=smote_strategy
+    )
 
     imb = params.get("imbalance", {})
 
     meta = {
         "summary": summary,
-        "imbalance_method": "none",
+        "normalization_method": norm_method,
+        "pca_enabled": False,
+        "pca_components": None,
+        "imbalance_method": imb_method,
         "imbalance": {
             "strategy": imb.get("strategy", "balanced_minority"),
             "rare_class_boost": float(imb.get("rare_class_boost", 1.2)),
             "rare_classes": list(imb.get("rare_classes", [0, 2])),
         },
-        "n_train": len(X_tr),
-        "n_val": len(X_val),
-        "n_test": len(X_test),
+        "n_train": int(len(X_tr)),
+        "n_val": int(len(X_val)),
+        "n_test": int(len(X_test)),
     }
 
     save_processed(
@@ -115,6 +145,15 @@ def run_prepare(force: bool = False) -> Path:
         le,
         meta,
     )
+
+    # Sauvegarder scaler si présent
+    if scaler is not None:
+        joblib.dump(scaler, processed_dir / "scaler.joblib")
+
+    # Nettoyer tout ancien PCA résiduel
+    pca_path = processed_dir / "pca.joblib"
+    if pca_path.is_file():
+        pca_path.unlink()
 
     legacy_sw = processed_dir / "train_sample_weight.npy"
     if legacy_sw.is_file():

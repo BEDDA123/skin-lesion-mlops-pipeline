@@ -13,9 +13,9 @@ from src.config import ROOT, load_params
 
 logger = logging.getLogger(__name__)
 
-# Mapping interne → API (2,4,6) → (0,1,2)
-INTERNAL_TO_API_LABELS = {2: 0, 4: 1, 6: 2}
-API_TO_INTERNAL_LABELS = {0: 2, 1: 4, 2: 6}
+# Les labels sont maintenant directement (0,1,2) après le remappage
+# 0 = nv (original 4), 1 = bkl (original 2), 2 = mel+bcc (original 6,1)
+# Aucun remappage supplémentaire n'est nécessaire
 
 
 def _artifacts_dir() -> Path:
@@ -29,6 +29,14 @@ def _processed_dir() -> Path:
 
 def load_label_encoder():
     return joblib.load(_processed_dir() / "label_encoder.joblib")
+
+
+def load_scaler():
+    """Charge le scaler si disponible."""
+    scaler_path = _processed_dir() / "scaler.joblib"
+    if scaler_path.is_file():
+        return joblib.load(scaler_path)
+    return None
 
 
 def load_best_model() -> tuple[Any, Any]:
@@ -56,6 +64,11 @@ def load_best_model() -> tuple[Any, Any]:
 
 def predict_batch(model, X_flat: np.ndarray, le) -> tuple[np.ndarray, np.ndarray]:
     """X_flat: (n, n_pixels) normalisé comme à l'entraînement."""
+    # Appliquer le scaler si disponible
+    scaler = load_scaler()
+    if scaler is not None:
+        X_flat = scaler.transform(X_flat)
+
     proba = model.predict_proba(X_flat)
     pred_idx = np.argmax(proba, axis=1)
     return pred_idx, proba
@@ -66,25 +79,20 @@ def indices_to_labels(indices: np.ndarray, le) -> list:
     return [le.classes_[int(i)] for i in indices]
 
 
-def map_internal_to_api(internal_label: int) -> int:
-    """Map internal label (2,4,6) to API label (0,1,2)."""
-    return INTERNAL_TO_API_LABELS.get(internal_label, internal_label)
-
-
-def map_api_to_internal(api_label: int) -> int:
-    """Map API label (0,1,2) to internal label (2,4,6)."""
-    return API_TO_INTERNAL_LABELS.get(api_label, api_label)
-
-
 def map_probabilities_to_api(proba: np.ndarray, le) -> dict[str, float]:
     """
-    Map probability array to API labels (0,1,2).
-    Input: proba array with internal label ordering
-    Output: dict with API label keys (0,1,2)
+    Convertir le tableau de probabilités en dict avec clés de labels.
+    Puisque les labels sont déjà (0,1,2), pas de remappage supplémentaire.
+    
+    Args:
+        proba: array de probabilités (shape: batch_size x n_classes)
+        le: LabelEncoder avec classes_ = [0, 1, 2]
+    
+    Returns:
+        dict: {"0": prob0, "1": prob1, "2": prob2}
     """
-    internal_labels = le.classes_
-    api_probs = {}
-    for i, internal_label in enumerate(internal_labels):
-        api_label = map_internal_to_api(int(internal_label))
-        api_probs[str(api_label)] = float(proba[0, i])
-    return api_probs
+    class_labels = le.classes_
+    probs_dict = {}
+    for i, label in enumerate(class_labels):
+        probs_dict[str(int(label))] = float(proba[0, i])
+    return probs_dict

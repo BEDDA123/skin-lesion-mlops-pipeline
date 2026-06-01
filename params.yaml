@@ -1,7 +1,7 @@
 # Chemins et hyperparamètres centralisés (modifiables sans toucher au code)
 data:
   # Définir SKIN_CSV_PATH pour surcharger (recommandé sous Windows)
-  raw_csv: data/raw/hmnist_filtered.csv
+  raw_csv: data/raw/hmnist_3classes.csv
   processed_dir: data/processed
   random_seed: 42
   test_size: 0.15
@@ -9,13 +9,20 @@ data:
 
 preprocess:
   normalize_max: 255.0
-  imbalance_method: none  # none (no resampling - original data only)
+  normalization_method: standard  # standard, minmax, robust
+  imbalance_method: none  # none, smote, smote_tomek, undersample
+  smote_strategy: auto  # auto ou dict {0: 1500, 1: 3000, 2: 1500}
+  
+pca:
+  enabled: false
+  variance_threshold: 0.95  # Conserver 95% de la variance
+  max_components: 500  # Maximum 500 components
 
 # Class imbalance handling (balanced weights with moderate boost for minority classes)
 imbalance:
   strategy: "balanced_minority"  # balanced_minority (moderate boost for rare classes)
   rare_class_boost: 1.2  # reduced boost to prevent overfitting
-  rare_classes: [0, 2]  # classes 0 and 2 are minority (after remapping from 2,4,6 to 0,1,2)
+  rare_classes: [1, 2]  # classes 1 and 2 are minority (after remapping from 2,4,6 to 0,1,2)
   
 # Calibration probabiliste (DISABLED - removed to prevent data leakage)
 calibration:

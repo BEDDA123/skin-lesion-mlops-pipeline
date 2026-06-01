@@ -104,6 +104,7 @@ def predict(req: PredictRequest):
         reference_X=_reference_X,
         X_batch=arr,
     )
+    
 
     return PredictResponse(
         predicted_index=int(pred_idx[0]),
