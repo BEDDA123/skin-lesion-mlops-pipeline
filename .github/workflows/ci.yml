@@ -22,7 +22,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Generate tiny dataset
-        run: python scripts/generate_tiny_dataset.py --out data/raw/hmnist_filtered.csv --rows 300
+        run: python scripts/generate_tiny_dataset.py --out data/raw/hmnist_3classes.csv --rows 300
 
       - name: Lint (ruff)
         run: ruff check src scripts tests
@@ -30,11 +30,45 @@ jobs:
       - name: Train pipeline (fast, prépare les artefacts pour les tests)
         env:
           FAST_TRAIN: "1"
-          SKIN_CSV_PATH: data/raw/hmnist_filtered.csv
-        run: python -m src.train --force-prepare
+          SKIN_CSV_PATH: data/raw/hmnist_3classes.csv
+          # Use an absolute workspace path for MLflow file store in CI
+          MLFLOW_TRACKING_URI: file:${{ github.workspace }}/mlruns
+        run: |
+          mkdir -p ${{ github.workspace }}/mlruns
+          python -m src.train --force-prepare
+
+      - name: Debug workspace (list mlruns & models)
+        if: always()
+        run: |
+          echo "PWD: $(pwd)"
+          ls -la
+          du -sh ${{ github.workspace }}/mlruns || true
+          ls -la models/artifacts || true
+
+      - name: Upload MLflow & model artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlruns
+          path: ${{ github.workspace }}/mlruns
+
+      - name: Upload models artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: models
+          path: models/artifacts/
 
       - name: Tests
         env:
           FAST_TRAIN: "1"
-          SKIN_CSV_PATH: data/raw/hmnist_filtered.csv
+          SKIN_CSV_PATH: data/raw/hmnist_3classes.csv
+          MLFLOW_TRACKING_URI: file:${{ github.workspace }}/mlruns
         run: pytest -q
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: reports/
