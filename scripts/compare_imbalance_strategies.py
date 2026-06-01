@@ -6,15 +6,12 @@ Teste trois stratégies de gestion du déséquilibre et compare les performances
 """
 
 import json
-import numpy as np
-import joblib
 import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, Any
 
 import pandas as pd
-from sklearn.metrics import classification_report, balanced_accuracy_score, roc_auc_score
 import yaml
 
 def run_experiment(config_name: str, imbalance_method: str, experiment_id: str) -> Dict[str, Any]:
@@ -38,7 +35,7 @@ def run_experiment(config_name: str, imbalance_method: str, experiment_id: str) 
     with open(params_file, 'w') as f:
         yaml.dump(params, f)
 
-    print(f"\n[1/3] Forcage du recalcul des données...")
+    print("\n[1/3] Forcage du recalcul des données...")
     result = subprocess.run(
         [sys.executable, 'src/train.py', '--prepare-only', '--force-prepare'],
         cwd=Path.cwd(),
@@ -49,7 +46,7 @@ def run_experiment(config_name: str, imbalance_method: str, experiment_id: str) 
         print(f"ERREUR: {result.stderr}")
         return None
 
-    print(f"[2/3] Entraînement du modèle...")
+    print("[2/3] Entraînement du modèle...")
     result = subprocess.run(
         [sys.executable, 'src/train.py', '--train-only'],
         cwd=Path.cwd(),
@@ -60,7 +57,7 @@ def run_experiment(config_name: str, imbalance_method: str, experiment_id: str) 
         print(f"ERREUR: {result.stderr}")
         return None
 
-    print(f"[3/3] Récupération des métriques...")
+    print("[3/3] Récupération des métriques...")
 
     # Chercher le derniers mlruns
     mlruns_dir = Path('mlruns/406321544010892008')
@@ -149,7 +146,7 @@ def compare_results(results: list) -> None:
 
     # Sauvegarder la comparaison
     df.to_csv('COMPARISON_RESULTS.csv', index=False)
-    print(f"\nResultats sauvegardés dans COMPARISON_RESULTS.csv")
+    print("\nResultats sauvegardés dans COMPARISON_RESULTS.csv")
 
 
 def main():
@@ -198,7 +195,7 @@ def main():
             print(f"\n❌ SMOTE est MEILLEUR de {(smote_f1-cw_f1)*100:.2f}%")
             print("   Recommandation: Garder SMOTE (mais analyser why)")
         else:
-            print(f"\n⚖️  Performances similaires")
+            print("\n⚖️  Performances similaires")
 
 
 if __name__ == '__main__':
