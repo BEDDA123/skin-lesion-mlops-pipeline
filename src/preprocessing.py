@@ -25,16 +25,7 @@ def normalize_pixels_advanced(
     X_test: np.ndarray,
     method: str = "standard"
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, StandardScaler]:
-    """
-    Normalisation avancée avec fit sur train uniquement pour éviter data leakage.
-    
-    Args:
-        X_train, X_val, X_test: Données à normaliser
-        method: 'standard', 'minmax', 'robust'
-    
-    Returns:
-        X_train_norm, X_val_norm, X_test_norm, scaler
-    """
+   
     if method == "standard":
         scaler = StandardScaler()
     elif method == "minmax":
@@ -64,17 +55,7 @@ def apply_pca(
     variance_threshold: float = 0.95,
     max_components: int = 500
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, PCA]:
-    """
-    Applique PCA avec conservation de variance spécifiée.
-    
-    Args:
-        X_train, X_val, X_test: Données normalisées
-        variance_threshold: Fraction de variance à conserver (0.95 = 95%)
-        max_components: Nombre maximum de components
-    
-    Returns:
-        X_train_pca, X_val_pca, X_test_pca, pca_model
-    """
+   
     # Fit PCA sur train uniquement
     pca = PCA(n_components=min(max_components, X_train.shape[1]))
     pca.fit(X_train)
@@ -148,17 +129,7 @@ def apply_imbalance_method(
     method: str = "none",
     sampling_strategy: str | dict = "auto"
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Applique une méthode de gestion du déséquilibre.
-    
-    Args:
-        X_train, y_train: Données d'entraînement
-        method: 'none', 'smote', 'smote_tomek', 'undersample'
-        sampling_strategy: 'auto' ou dict {class: ratio}
-    
-    Returns:
-        X_train_bal, y_train_bal
-    """
+   
     if method == "none":
         logger.info("Using original training data without resampling")
         return X_train, y_train
