@@ -1,7 +1,4 @@
-"""
-Tuning d'hyperparamètres avec Optuna pour maximiser F1 macro.
-À utiliser une fois par expérience de développement (coûteux en temps).
-"""
+
 
 from __future__ import annotations
 

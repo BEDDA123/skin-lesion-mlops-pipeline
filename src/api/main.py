@@ -27,7 +27,7 @@ _reference_X: np.ndarray | None = None
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler - replaces deprecated @app.on_event."""
+   
     global _model, _label_encoder, _reference_X
 
     # Startup

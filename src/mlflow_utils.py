@@ -22,13 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup_mlflow_experiment(experiment_name: str, tracking_uri: str = None) -> None:
-    """
-    Setup MLflow experiment and tracking URI.
-    
-    Args:
-        experiment_name: Name of the MLflow experiment
-        tracking_uri: MLflow tracking URI (default: from config)
-    """
+  
     if tracking_uri:
         mlflow.set_tracking_uri(tracking_uri)
     
@@ -37,14 +31,7 @@ def setup_mlflow_experiment(experiment_name: str, tracking_uri: str = None) -> N
 
 
 def log_hyperparameters(params: dict, model_name: str, model_params: dict) -> None:
-    """
-    Log all hyperparameters to MLflow.
-    
-    Args:
-        params: Global parameters dictionary
-        model_name: Name of the model being trained
-        model_params: Model-specific hyperparameters
-    """
+   
     # Global parameters
     mlflow.log_params({
         "model": model_name,
@@ -64,13 +51,7 @@ def log_hyperparameters(params: dict, model_name: str, model_params: dict) -> No
 
 
 def log_metrics(metrics: dict, prefix: str = "") -> None:
-    """
-    Log metrics to MLflow with optional prefix.
     
-    Args:
-        metrics: Dictionary of metric names and values
-        prefix: Prefix to add to metric names (e.g., "val_", "test_")
-    """
     for metric_name, metric_value in metrics.items():
         mlflow.log_metric(f"{prefix}{metric_name}", metric_value)
     
@@ -78,14 +59,7 @@ def log_metrics(metrics: dict, prefix: str = "") -> None:
 
 
 def log_model_artifacts(model, model_name: str, artifacts_dir: Path) -> None:
-    """
-    Log model artifacts to MLflow.
     
-    Args:
-        model: Trained model object
-        model_name: Name of the model
-        artifacts_dir: Directory to save model artifacts
-    """
     # Log sklearn model
     mlflow.sklearn.log_model(model, artifact_path="model")
     
@@ -105,17 +79,7 @@ def log_evaluation_artifacts(
     y_proba: np.ndarray,
     label_encoder=None
 ) -> None:
-    """
-    Log evaluation artifacts to MLflow.
     
-    Args:
-        reports_dir: Directory containing evaluation reports
-        model_name: Name of the model
-        y_test: True test labels
-        y_pred: Predicted labels
-        y_proba: Predicted probabilities
-        label_encoder: Label encoder for class names
-    """
     # Log confusion matrix
     cm_path = reports_dir / f"confusion_{model_name}_test.png"
     if cm_path.exists():
@@ -147,15 +111,7 @@ def generate_roc_curve(
     label_encoder=None,
     output_path: Path = None
 ) -> None:
-    """
-    Generate ROC curve for multi-class classification.
     
-    Args:
-        y_true: True labels
-        y_proba: Predicted probabilities (n_samples, n_classes)
-        label_encoder: Label encoder for class names
-        output_path: Path to save the ROC curve plot
-    """
     n_classes = y_proba.shape[1]
     
     plt.figure(figsize=(10, 8))
@@ -246,16 +202,7 @@ def register_best_model(
 
 
 def compare_runs(experiment_name: str, metric_name: str = "test_f1_macro") -> dict:
-    """
-    Compare runs in an experiment and find the best one.
-    
-    Args:
-        experiment_name: Name of the experiment
-        metric_name: Metric to compare
-    
-    Returns:
-        Dictionary with best run information
-    """
+   
     experiment = mlflow.get_experiment_by_name(experiment_name)
     if experiment is None:
         raise ValueError(f"Experiment {experiment_name} not found")
@@ -283,16 +230,7 @@ def log_training_summary(
     training_time: float,
     class_distribution: dict
 ) -> None:
-    """
-    Log training summary information.
-    
-    Args:
-        n_train: Number of training samples
-        n_val: Number of validation samples
-        n_test: Number of test samples
-        training_time: Training time in seconds
-        class_distribution: Dictionary of class distributions
-    """
+   
     mlflow.log_params({
         "n_train": n_train,
         "n_val": n_val,

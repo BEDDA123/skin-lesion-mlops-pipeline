@@ -13,9 +13,7 @@ def compute_balanced_class_weights(
     rare_classes: list[int] | None = None,
     rare_class_boost: float = 1.0,
 ) -> dict[int, float]:
-    """
-    Poids balanced sklearn, avec renforcement optionnel des classes rares.
-    """
+    
     classes = np.unique(y)
 
     weights = compute_class_weight(

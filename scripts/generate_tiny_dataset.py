@@ -1,7 +1,4 @@
-"""
-Génère un petit CSV synthétique (2352 pixels + label) pour CI ou tests locaux rapides.
-Usage: python scripts/generate_tiny_dataset.py --out data/raw/tiny_synthetic.csv --rows 120
-"""
+
 
 from __future__ import annotations
 

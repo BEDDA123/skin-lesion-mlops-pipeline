@@ -15,10 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class WeightedVotingEnsemble:
-    """
-    Ensemble pondéré où chaque modèle a un poids basé sur sa performance.
-    Les poids sont calculés selon le F1 macro de validation.
-    """
+    
 
     def __init__(self):
         self.models = []
@@ -26,16 +23,14 @@ class WeightedVotingEnsemble:
         self.is_fitted = False
 
     def add_model(self, model: Any, weight: float | None = None) -> None:
-        """Ajoute un modèle à l'ensemble."""
+       
         self.models.append(model)
         if weight is None:
             weight = 1.0 / len(self.models)
         self.weights.append(float(weight))
 
     def fit_weights_from_validation(self, X_val: np.ndarray, y_val: np.ndarray) -> None:
-        """
-        Calcule les poids des modèles basés sur leur F1 macro en validation.
-        """
+        
         from sklearn.metrics import f1_score
 
         f1_scores = []
@@ -86,9 +81,7 @@ def create_stacking_ensemble(
     final_estimator: Any | None = None,
     cv: int = 5,
 ) -> StackingClassifier:
-    """
-    Crée un ensemble Stacking avec métaclassifieur.
-    """
+   
     if final_estimator is None:
         final_estimator = LogisticRegression(max_iter=3000, multi_class="multinomial")
 
@@ -108,9 +101,7 @@ def create_voting_ensemble(
     voting: str = "soft",
     weights: list[float] | None = None,
 ) -> VotingClassifier:
-    """
-    Crée un ensemble Voting simple.
-    """
+    
     voting_clf = VotingClassifier(
         estimators=estimators,
         voting=voting,
