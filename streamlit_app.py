@@ -12,8 +12,8 @@ API_DEFAULT_URL = "http://127.0.0.1:8000/predict"
 EXPECTED_FEATURE_COUNT = 28 * 28 * 3
 LABEL_NAME_MAP = {
     "0": "nv",
-    "1": "bkl",
-    "2": "mel/bcc",
+    "1": "Benign Skin Lesions",
+    "2": "Malignant  Skin Lesions",
 }
 
 

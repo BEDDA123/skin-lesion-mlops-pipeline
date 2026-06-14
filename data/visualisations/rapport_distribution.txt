@@ -1,5 +1,24 @@
-Rapport de transformation HAM10000 en 3 classes
----------------------------------------------
+Rapport de transformation HAM10000 en 3 catégories cliniques
+-----------------------------------------------------------
+Justification du regroupement des 7 classes HAM10000 en 3 catégories:
+
+Classe 0 (Melanocytic Nevi - nv):
+  - Lésions bénignes homogènes
+  - Classe la plus représentée du dataset
+  - Caractéristiques visuelles relativement homogènes
+
+Classe 1 (Lésions bénignes):
+  - Benign Keratosis-like Lesions (bkl)
+  - Dermatofibroma (df)
+  - Vascular Lesions (vasc)
+  - Propriétés morphologiques similaires
+
+Classe 2 (Lésions malignes/précancéreuses):
+  - Melanoma (mel)
+  - Basal Cell Carcinoma (bcc)
+  - Actinic Keratoses (akiec)
+  - Intérêt clinique majeur pour le diagnostic IA
+
 Distribution avant prétraitement:
   Classe 0: 327
   Classe 1: 514
@@ -11,10 +30,17 @@ Distribution avant prétraitement:
 
 Distribution après prétraitement:
   Classe 0: 6705
-  Classe 1: 1099
-  Classe 2: 1627
+  Classe 1: 1356
+  Classe 2: 1954
 
 Nombre de classes avant prétraitement: 7
 Nombre de classes après prétraitement: 3
-Remappage appliqué: 4->0, 2->1, 1->2, 6->2
-Classes supprimées: 0, 3, 5
+
+Remappage appliqué:
+  0 (akiec) -> 2 (malin)
+  1 (bcc) -> 2 (malin)
+  2 (bkl) -> 1 (bénin)
+  3 (df) -> 1 (bénin)
+  4 (nv) -> 0 (nevi)
+  5 (vasc) -> 1 (bénin)
+  6 (mel) -> 2 (malin)

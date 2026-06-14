@@ -27,17 +27,37 @@ def compute_distribution(df: pd.DataFrame) -> pd.Series:
 
 
 def filter_and_remap_labels(df: pd.DataFrame) -> pd.DataFrame:
-    """Supprime certaines classes, fusionne d'autres classes et remappe les labels."""
+    """Regroupe les 7 classes HAM10000 originales en 3 catégories cliniques.
+    
+    Justification du regroupement:
+    - Classe 0: Melanocytic Nevi (nv) - lésions bénignes homogènes
+    - Classe 1: Benign Keratosis-like (bkl), Dermatofibroma (df), Vascular (vasc) - lésions bénignes
+    - Classe 2: Melanoma (mel), Basal Cell Carcinoma (bcc), Actinic Keratoses (akiec) - lésions malignes/précancéreuses
+    
+    Mapping des classes originales (0-6) vers les 3 nouvelles catégories:
+    - akiec (0) -> 2 (malin)
+    - bcc (1) -> 2 (malin)
+    - bkl (2) -> 1 (bénin)
+    - df (3) -> 1 (bénin)
+    - nv (4) -> 0 (nevi)
+    - vasc (5) -> 1 (bénin)
+    - mel (6) -> 2 (malin)
+    """
     # Conversion en int pour éviter les problèmes de labels stockés comme chaîne
     df = df.copy()
     df["label"] = df["label"].astype(int)
 
-    # 1. Supprimer les classes non désirées: akiec(0), df(3), vasc(5)
-    classes_supprimees = {0, 3, 5}
-    df = df[~df["label"].isin(classes_supprimees)]
-
-    # 2. Fusionner mel(6) et bcc(1) dans la nouvelle classe 2
-    mapping = {4: 0, 2: 1, 1: 2, 6: 2}
+    # Remappage complet des 7 classes originales vers 3 catégories cliniques
+    mapping = {
+        0: 2,  # akiec (Actinic Keratoses) -> malin
+        1: 2,  # bcc (Basal Cell Carcinoma) -> malin
+        2: 1,  # bkl (Benign Keratosis-like) -> bénin
+        3: 1,  # df (Dermatofibroma) -> bénin
+        4: 0,  # nv (Melanocytic Nevi) -> nevi
+        5: 1,  # vasc (Vascular Lesions) -> bénin
+        6: 2,  # mel (Melanoma) -> malin
+    }
+    
     df["label"] = df["label"].map(mapping)
 
     if df["label"].isna().any():
@@ -129,8 +149,27 @@ def plot_correlation_matrix(df: pd.DataFrame, save_path: Path, max_features: int
 def save_report(before_counts: pd.Series, after_counts: pd.Series, output_path: Path) -> None:
     """Sauvegarde un rapport textuel des distributions avant et après."""
     lines = [
-        "Rapport de transformation HAM10000 en 3 classes",
-        "---------------------------------------------",
+        "Rapport de transformation HAM10000 en 3 catégories cliniques",
+        "-----------------------------------------------------------",
+        "Justification du regroupement des 7 classes HAM10000 en 3 catégories:",
+        "",
+        "Classe 0 (Melanocytic Nevi - nv):",
+        "  - Lésions bénignes homogènes",
+        "  - Classe la plus représentée du dataset",
+        "  - Caractéristiques visuelles relativement homogènes",
+        "",
+        "Classe 1 (Lésions bénignes):",
+        "  - Benign Keratosis-like Lesions (bkl)",
+        "  - Dermatofibroma (df)",
+        "  - Vascular Lesions (vasc)",
+        "  - Propriétés morphologiques similaires",
+        "",
+        "Classe 2 (Lésions malignes/précancéreuses):",
+        "  - Melanoma (mel)",
+        "  - Basal Cell Carcinoma (bcc)",
+        "  - Actinic Keratoses (akiec)",
+        "  - Intérêt clinique majeur pour le diagnostic IA",
+        "",
         "Distribution avant prétraitement:",
     ]
     lines += [f"  Classe {idx}: {count}" for idx, count in before_counts.items()]
@@ -140,8 +179,15 @@ def save_report(before_counts: pd.Series, after_counts: pd.Series, output_path: 
         "",
         f"Nombre de classes avant prétraitement: {len(before_counts)}",
         f"Nombre de classes après prétraitement: {len(after_counts)}",
-        "Remappage appliqué: 4->0, 2->1, 1->2, 6->2",
-        "Classes supprimées: 0, 3, 5",
+        "",
+        "Remappage appliqué:",
+        "  0 (akiec) -> 2 (malin)",
+        "  1 (bcc) -> 2 (malin)",
+        "  2 (bkl) -> 1 (bénin)",
+        "  3 (df) -> 1 (bénin)",
+        "  4 (nv) -> 0 (nevi)",
+        "  5 (vasc) -> 1 (bénin)",
+        "  6 (mel) -> 2 (malin)",
     ]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,12 +199,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
             """
-            Prétraite le dataset HAM10000 pour réduire le problème de classification à 3 classes.
+            Prétraite le dataset HAM10000 pour réduire le problème de classification à 3 catégories cliniques.
 
-            - Supprime les labels 0, 3, 5
-            - Fusionne les labels 6 et 1 dans la classe 2
-            - Remappe 4 -> 0, 2 -> 1, {1, 6} -> 2
-            - Sauvegarde le nouveau CSV et crée des visualisations
+            Regroupement justifié par des considérations cliniques et statistiques:
+            - Classe 0: Melanocytic Nevi (nv)
+            - Classe 1: Benign Keratosis-like (bkl), Dermatofibroma (df), Vascular Lesions (vasc)
+            - Classe 2: Melanoma (mel), Basal Cell Carcinoma (bcc), Actinic Keratoses (akiec)
+            
+            Remappage complet:
+            - akiec (0) -> 2 (malin)
+            - bcc (1) -> 2 (malin)
+            - bkl (2) -> 1 (bénin)
+            - df (3) -> 1 (bénin)
+            - nv (4) -> 0 (nevi)
+            - vasc (5) -> 1 (bénin)
+            - mel (6) -> 2 (malin)
             """
         )
     )

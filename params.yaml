@@ -10,6 +10,7 @@ data:
 preprocess:
   normalize_max: 255.0
   normalization_method: standard  # standard, minmax, robust
+  nv_max_samples: 3000  # undersampling aléatoire de la classe NV (0); null pour désactiver
   imbalance_method: none  # none, smote, smote_tomek, undersample
   smote_strategy: auto  # auto ou dict {0: 1500, 1: 3000, 2: 1500}
   

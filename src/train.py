@@ -54,6 +54,7 @@ from src.preprocessing import (
     normalize_pixels_advanced,
     save_processed,
     stratified_splits,
+    undersample_class,
 )
 from src.training_utils import maybe_subsample
 
@@ -67,16 +68,46 @@ def run_prepare(force: bool = False) -> Path:
     processed_dir = ROOT / params["data"]["processed_dir"]
     dataset_file = processed_dir / "dataset.npz"
 
+    imb_method = params["preprocess"].get("imbalance_method", "none")
+    smote_strategy = params["preprocess"].get("smote_strategy", "auto")
+    norm_method = params["preprocess"].get("normalization_method", "standard")
+    normalize_max = float(params["preprocess"].get("normalize_max", 255.0))
+    nv_max_samples = params["preprocess"].get("nv_max_samples")
+    if nv_max_samples is not None:
+        nv_max_samples = int(nv_max_samples)
+
     if dataset_file.is_file() and not force:
         raw_mtime = raw_path.stat().st_mtime
         processed_mtime = dataset_file.stat().st_mtime
         if raw_mtime <= processed_mtime:
-            logger.info("Données déjà préparées: %s", processed_dir)
-            return processed_dir
-        logger.warning(
-            "Le fichier source raw est plus récent que le dataset preprocessé. "
-            "Régénération du preprocessing..."
-        )
+            meta_file = processed_dir / "meta.json"
+            params_match = False
+            if meta_file.is_file():
+                try:
+                    with open(meta_file, encoding="utf-8") as f:
+                        existing_meta = json.load(f)
+                    params_match = (
+                        existing_meta.get("imbalance_method") == imb_method
+                        and existing_meta.get("smote_strategy") == smote_strategy
+                        and existing_meta.get("normalization_method") == norm_method
+                        and float(existing_meta.get("normalize_max", 255.0)) == normalize_max
+                        and existing_meta.get("nv_max_samples") == nv_max_samples
+                    )
+                except Exception as e:
+                    logger.warning("Impossible de lire le meta existant: %s", e)
+
+            if params_match:
+                logger.info("Données déjà préparées: %s", processed_dir)
+                return processed_dir
+
+            logger.info(
+                "Recalcule du preprocessing nécessaire car les paramètres de prétraitement ont changé."
+            )
+        else:
+            logger.warning(
+                "Le fichier source raw est plus récent que le dataset preprocessé. "
+                "Régénération du preprocessing..."
+            )
 
     df = load_csv(raw_path)
     summary = validate_dataset(df)
@@ -85,10 +116,31 @@ def run_prepare(force: bool = False) -> Path:
     X, y = split_features_labels(df)
     
     # Normalisation simple initiale
-    X = normalize_pixels(X, max_val=params["preprocess"]["normalize_max"])
+    X = normalize_pixels(X, max_val=normalize_max)
     y_enc, le = encode_labels(y)
 
     seed = int(params["data"]["random_seed"])
+
+    counts_before_nv_cap = np.bincount(y_enc)
+    logger.info(
+        "Distribution des classes avant undersampling NV: %s",
+        counts_before_nv_cap.tolist(),
+    )
+
+    # Undersampling NV (classe 0) avant le split pour éviter toute fuite vers val/test
+    X, y_enc = undersample_class(
+        X,
+        y_enc,
+        target_class=0,
+        max_samples=nv_max_samples,
+        random_state=seed,
+    )
+
+    counts_after_nv_cap = np.bincount(y_enc)
+    logger.info(
+        "Distribution des classes après undersampling NV: %s",
+        counts_after_nv_cap.tolist(),
+    )
 
     X_train, X_val, X_test, y_train, y_val, y_test = stratified_splits(
         X,
@@ -99,7 +151,6 @@ def run_prepare(force: bool = False) -> Path:
     )
 
     # Normalisation avancée
-    norm_method = params["preprocess"].get("normalization_method", "standard")
     X_train, X_val, X_test, scaler = normalize_pixels_advanced(
         X_train, X_val, X_test, method=norm_method
     )
@@ -108,22 +159,55 @@ def run_prepare(force: bool = False) -> Path:
     logger.info("Nombre de features après preprocessing: %d", X_train.shape[1])
 
     # Gestion du déséquilibre
-    imb_method = params["preprocess"].get("imbalance_method", "none")
-    smote_strategy = params["preprocess"].get("smote_strategy", "auto")
+    # We apply SMOTE (or other resampling methods) only on the training set
+    # after the train/validation/test split. Validation and test remain untouched.
+    processed_dir.mkdir(parents=True, exist_ok=True)
+
+    orig_counts = np.bincount(y_train)
+    logger.info("Distribution originale des classes (train) avant resampling: %s", orig_counts.tolist())
+
     X_tr, y_tr = apply_imbalance_method(
-        X_train, y_train, 
+        X_train,
+        y_train,
         method=imb_method,
-        sampling_strategy=smote_strategy
+        sampling_strategy=smote_strategy,
     )
+
+    new_counts = np.bincount(y_tr)
+    n_synthetic = int(len(y_tr) - len(y_train))
+
+    logger.info("Distribution des classes après resampling (train): %s", new_counts.tolist())
+    logger.info("Nombre d'échantillons synthétiques générés: %d", n_synthetic)
+
+    try:
+        dist_info = {
+            "original_train_distribution": orig_counts.tolist(),
+            "resampled_train_distribution": new_counts.tolist(),
+            "n_synthetic": n_synthetic,
+            "imbalance_method": imb_method,
+            "smote_strategy": smote_strategy,
+        }
+
+        with open(processed_dir / "class_distribution_before_after_smote.json", "w", encoding="utf-8") as _f:
+            json.dump(dist_info, _f, indent=2)
+
+        logger.info("Saved class distribution info to %s", processed_dir / "class_distribution_before_after_smote.json")
+    except Exception as e:
+        logger.warning("Failed to save class distribution info: %s", e)
 
     imb = params.get("imbalance", {})
 
     meta = {
         "summary": summary,
         "normalization_method": norm_method,
+        "normalize_max": normalize_max,
+        "nv_max_samples": nv_max_samples,
+        "class_distribution_before_nv_cap": counts_before_nv_cap.tolist(),
+        "class_distribution_after_nv_cap": counts_after_nv_cap.tolist(),
         "pca_enabled": False,
         "pca_components": None,
         "imbalance_method": imb_method,
+        "smote_strategy": smote_strategy,
         "imbalance": {
             "strategy": imb.get("strategy", "balanced_minority"),
             "rare_class_boost": float(imb.get("rare_class_boost", 1.2)),

@@ -76,6 +76,55 @@ def apply_pca(
     return X_train_pca, X_val_pca, X_test_pca, pca
 
 
+def undersample_class(
+    X: np.ndarray,
+    y: np.ndarray,
+    *,
+    target_class: int = 0,
+    max_samples: int | None = None,
+    random_state: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Undersampling aléatoire d'une seule classe si elle dépasse max_samples.
+
+    Les autres classes sont conservées intégralement. À appliquer après le
+    remapping des labels (classe 0 = nv) et avant le split train/val/test.
+    """
+    if max_samples is None:
+        return X, y
+
+    n_target = int(np.sum(y == target_class))
+    if n_target <= max_samples:
+        logger.info(
+            "Classe %d: %d échantillons (<= max %d), pas d'undersampling",
+            target_class,
+            n_target,
+            max_samples,
+        )
+        return X, y
+
+    rng = np.random.default_rng(random_state)
+    target_indices = np.flatnonzero(y == target_class)
+    other_indices = np.flatnonzero(y != target_class)
+    selected_target = rng.choice(target_indices, size=max_samples, replace=False)
+    kept_indices = np.sort(np.concatenate([selected_target, other_indices]))
+
+    logger.info(
+        "Undersampling classe %d: %d -> %d échantillons (random_state=%d)",
+        target_class,
+        n_target,
+        max_samples,
+        random_state,
+    )
+    logger.info(
+        "Taille du dataset: %d -> %d lignes",
+        len(y),
+        len(kept_indices),
+    )
+
+    return X[kept_indices], y[kept_indices]
+
+
 def encode_labels(y: np.ndarray) -> tuple[np.ndarray, LabelEncoder]:
     """
     Encode et valide les labels pour la classification 3-classes.
