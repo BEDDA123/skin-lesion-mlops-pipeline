@@ -47,10 +47,10 @@ def load_best_model() -> tuple[Any, Any]:
     name = str(best["model_name"])
     le = load_label_encoder()
 
-    if name == "logistic_regression":
-        return joblib.load(art / "logreg.joblib"), le
-    if name == "random_forest":
-        return joblib.load(art / "rf.joblib"), le
+    if name == "svm":
+        return joblib.load(art / "svm.joblib"), le
+    if name == "mlp":
+        return joblib.load(art / "mlp.joblib"), le
     if name == "xgboost":
         path = art / "xgb.joblib"
         if not path.is_file():

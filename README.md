@@ -1,207 +1,271 @@
-# Classification automatisée des lésions cutanées via une approche MLOps
+# Classification automatisée des lésions cutanées — Projet MLOps
 
-## Présentation du projet
+## Présentation
 
-Ce projet met en œuvre une solution complète de classification automatisée des lésions cutanées basée sur une approche MLOps.
+Ce projet met en œuvre un **pipeline MLOps complet** pour la classification de lésions cutanées à partir de données de pixels (images 28×28 RGB aplaties en vecteurs de 2352 features). L'approche repose exclusivement sur des **modèles de machine learning classiques** (sans CNN ni deep learning) : Logistic Regression, Random Forest et XGBoost.
 
-L’objectif principal est de concevoir un pipeline de Machine Learning reproductible couvrant l’ensemble du cycle de vie d’un modèle, allant de la préparation des données jusqu’au déploiement en production.
-
-Le projet intègre plusieurs étapes essentielles, notamment l’entraînement et l’évaluation de plusieurs modèles, le suivi des expérimentations via MLflow, le déploiement d’une API REST, la création d’une interface utilisateur, ainsi que la mise en place d’un système de monitoring en environnement de production.
-
-Ainsi, l’ensemble du workflow permet d’assurer la reproductibilité, la traçabilité et la maintenabilité du système.
+L'objectif est de couvrir l'ensemble du cycle de vie d'un modèle ML : préparation des données, entraînement, évaluation, suivi d'expériences, déploiement API, interface utilisateur et monitoring en production — avec reproductibilité, traçabilité et maintenabilité.
 
 ---
 
-## Objectif
+## Résumé des réalisations
 
-Développer un système intelligent capable de classifier automatiquement des lésions cutanées à partir de données de pixels extraites d’images dermatologiques et de fournir une prédiction accompagnée d’un niveau de confiance.
+### 1. Données et regroupement des classes
 
----
+- Utilisation du dataset public **HAM10000** (`hmnist_28_28_RGB.csv`).
+- Regroupement des **7 classes originales en 3 catégories cliniques** via `data/raw/dat.py` :
+  - **Classe 0** — Nevus mélanocytaire (nv)
+  - **Classe 1** — Lésions bénignes (bkl, df, vasc)
+  - **Classe 2** — Lésions malignes / précancéreuses (mel, bcc, akiec)
+- Dataset traité exporté : `data/raw/hmnist_3classes.csv`
+- Visualisations et rapport de distribution : `data/visualisations/`
+- Documentation de justification : [`docs/HAM10000_3CLASSES_JUSTIFICATION.md`](docs/HAM10000_3CLASSES_JUSTIFICATION.md)
 
-## Dataset
+### 2. Pipeline de prétraitement (`src/preprocessing.py`, `src/train.py`)
 
-Le projet utilise le dataset HAM10000, une base de données publique largement utilisée dans le domaine de la dermatologie.
+| Étape | Description |
+|-------|-------------|
+| Ingestion | Chargement CSV, validation, détection des valeurs manquantes |
+| Normalisation simple | Division des pixels par 255 |
+| Encodage des labels | Remapping séquentiel 0, 1, 2 |
+| **Undersampling NV** | Limitation de la classe majoritaire (NV) à **3000 échantillons max** (`nv_max_samples` dans `params.yaml`), reproductible (`random_state=42`), **avant le split** pour éviter toute fuite de données |
+| Split stratifié | Train 70 % / Validation 15 % / Test 15 % |
+| Normalisation avancée | StandardScaler (ou MinMax / Robust) — **fit sur le train uniquement** |
+| PCA (optionnel) | Réduction de dimension configurable (désactivée par défaut) |
+| Rééquilibrage (optionnel) | SMOTE, SMOTE+Tomek ou undersampling **sur le train uniquement** |
+| Sauvegarde | `data/processed/dataset.npz`, scaler, label encoder, métadonnées |
 
-### Données utilisées
+**Distribution après undersampling NV :**
 
-Les images sont représentées sous forme de vecteurs de pixels RGB :
+| Classe | Avant cap | Après cap (max 3000 NV) |
+|--------|-----------|-------------------------|
+| 0 (nv) | ~6 705 | 3 000 |
+| 1 (bénin) | ~1 356 | 1 356 |
+| 2 (malin) | ~1 954 | 1 954 |
+| **Total** | ~10 015 | **~6 310** |
 
-* Taille des images : 28 × 28 pixels
-* Nombre de canaux : 3 (RGB)
-* Nombre total de caractéristiques : 2352 pixels
+### 3. Gestion du déséquilibre des classes
 
-### Regroupement des classes
+- **Undersampling ciblé NV** : réduit la domination de la classe majoritaire sans toucher aux classes minoritaires.
+- **Class weights** (`src/class_weights.py`) : stratégie `balanced_minority` avec boost modéré des classes rares (1 et 2).
+- **SMOTE / undersampling imblearn** : disponibles en complément, appliqués uniquement sur le jeu d'entraînement.
+- Analyse documentée des confusions inter-classes (nv / mel / bcc) : [`docs/CONFUSION_ANALYSIS_AND_SOLUTIONS.md`](docs/CONFUSION_ANALYSIS_AND_SOLUTIONS.md)
 
-Les 7 classes originales du dataset ont été regroupées en 3 classes afin de réduire le déséquilibre des données :
+### 4. Modèles et entraînement
 
-| Classe | Description                                     |
-| ------ | ----------------------------------------------- |
-| 0      | Nevus mélanocytaire (nv)                        |
-| 1      | Kératose bénigne (bkl)                          |
-| 2      | Mélanome + Carcinome basocellulaire (mel + bcc) |
+Trois algorithmes comparés automatiquement :
 
-Distribution finale :
+| Modèle | Particularités |
+|--------|----------------|
+| **Logistic Regression** | Régularisation L2 (`C=0.5`), solver `saga`, class weights |
+| **Random Forest** | 300 arbres, `max_depth=10`, feuilles min. 4 — limiter l'overfitting |
+| **XGBoost** | 400 estimateurs, régularisation L1/L2 renforcée, `sample_weight` |
 
-* Classe 0 : 6705 échantillons
-* Classe 1 : 1099 échantillons
-* Classe 2 : 1627 échantillons
+- Hyperparamètres centralisés dans [`params.yaml`](params.yaml)
+- Sélection automatique du meilleur modèle (F1 macro sur validation)
+- Artefacts sauvegardés dans `models/artifacts/`
+- Module d'optimisation Optuna disponible : `src/hyperparameter_tuning.py`
+- Ensembles avancés (voting pondéré, stacking) : `src/ensemble_methods.py`
 
----
+### 5. Évaluation et diagnostic
 
-## Prétraitement des données
+- Métriques : accuracy, precision, recall, F1-score (macro / par classe), ROC-AUC
+- Matrices de confusion exportées en PNG (`reports/figures/`)
+- Rapports de classification JSON par modèle
+- Diagnostic approfondi (`src/diagnostic.py`) : entropie des prédictions, analyse par classe, identification des confusions
+- Comparaison des modèles : `reports/figures/model_comparison.csv`
 
-Les principales étapes de préparation des données sont :
+### 6. Suivi MLOps avec MLflow
 
-* Nettoyage des données
-* Vérification des valeurs manquantes
-* Réorganisation des classes
-* Encodage des labels
-* Normalisation des pixels
-* Séparation Train / Validation / Test
+- Enregistrement des hyperparamètres, métriques et artefacts
+- Comparaison des runs (`skin_lesion_3class`)
+- Support du Model Registry (optionnel)
+- Interface MLflow disponible via Docker (port 5000)
 
-Afin de limiter l’impact du déséquilibre des classes, une stratégie de pondération des classes (Class Weights) a été utilisée lors de l’entraînement.
+### 7. Déploiement et interface
 
----
-
-## Modèles de Machine Learning
-
-Trois algorithmes ont été évalués :
-
-* Logistic Regression
-* Random Forest
-* XGBoost
-
-Les performances sont comparées à l’aide de plusieurs métriques :
-
-* Accuracy
-* Precision
-* Recall
-* F1-score
-* ROC-AUC
-
-Le meilleur modèle est automatiquement sélectionné à partir des performances obtenues sur les données de validation.
-
----
-
-
-
-
-## Technologies utilisées
-
-* Python
-* Scikit-Learn
-* XGBoost
-* Pandas
-* NumPy
-* FastAPI
-* Streamlit
-* MLflow
-* Docker
-* GitHub Actions
-* DVC
-* Pytest
-* Ruff
-
----
-
-
-
-## Suivi des expérimentations
-
-MLflow est utilisé pour :
-
-* Enregistrer les métriques
-* Sauvegarder les modèles
-* Comparer les performances
-* Conserver l’historique des expériences
-
----
-
-## API REST avec FastAPI
-
-L’API expose plusieurs endpoints :
-
-### Vérification de l’état du service
+**API REST FastAPI** (`src/api/main.py`) :
 
 ```bash
-GET /health
+GET  /health    # État du service
+POST /predict   # Prédiction à partir d'un vecteur de pixels
 ```
 
-### Prédiction
+**Interface Streamlit** (`streamlit_app.py`) :
+- Upload d'image JPG/PNG
+- Redimensionnement 28×28, conversion RGB, extraction des pixels
+- Envoi à l'API et affichage du résultat avec probabilités
+
+### 8. Monitoring en production
+
+Module `src/monitoring/` :
+- Latence des prédictions
+- Probabilité maximale et classe prédite
+- Mean Absolute Drift par rapport à une référence
+- Logs JSONL dans `reports/logs/`
+
+### 9. Reproductibilité et industrialisation
+
+| Outil | Rôle |
+|-------|------|
+| **DVC** | Pipeline `prepare` → `train` versionné (`dvc.yaml`) |
+| **Docker** | Containerisation API + MLflow UI (`Dockerfile`, `docker-compose.yml`) |
+| **GitHub Actions** | CI : lint Ruff, entraînement rapide, tests Pytest |
+| **Pytest** | Tests unitaires (ingestion, preprocessing, API, class weights) |
+| **params.yaml** | Configuration unique pour tout le pipeline |
+
+---
+
+## Architecture du projet
+
+```
+pfa/
+├── data/
+│   ├── raw/
+│   │   ├── dat.py                  # Regroupement 7 → 3 classes
+│   │   └── hmnist_3classes.csv     # Dataset prétraité
+│   ├── processed/                  # Données splitées et normalisées
+│   └── visualisations/             # Graphiques de distribution
+├── docs/
+│   ├── HAM10000_3CLASSES_JUSTIFICATION.md
+│   └── CONFUSION_ANALYSIS_AND_SOLUTIONS.md
+├── models/artifacts/               # Modèles entraînés (.joblib)
+├── reports/
+│   ├── figures/                    # Matrices de confusion, rapports
+│   └── logs/                       # Monitoring JSONL
+├── src/
+│   ├── train.py                    # Orchestration prepare + train
+│   ├── preprocessing.py            # Normalisation, split, undersampling NV
+│   ├── ingestion.py                # Chargement et validation CSV
+│   ├── class_weights.py            # Pondération des classes
+│   ├── evaluation.py               # Métriques et visualisations
+│   ├── diagnostic.py               # Analyse des confusions
+│   ├── ensemble_methods.py         # Voting / Stacking
+│   ├── hyperparameter_tuning.py    # Optimisation Optuna
+│   ├── mlflow_utils.py             # Intégration MLflow
+│   ├── inference.py                # Inférence locale
+│   ├── api/main.py                 # API FastAPI
+│   └── monitoring/                 # Métriques production
+├── tests/                          # Tests unitaires
+├── streamlit_app.py                # Interface utilisateur
+├── params.yaml                     # Hyperparamètres centralisés
+├── dvc.yaml                        # Pipeline DVC
+├── Dockerfile
+└── docker-compose.yml
+```
+
+---
+
+## Démarrage rapide
+
+### Prérequis
 
 ```bash
-POST /predict
+pip install -r requirements.txt
 ```
 
-Entrée :
+### 1. Générer le dataset 3 classes (si nécessaire)
 
-```json
-{
-  "pixels": [...],
-  "normalize": true
-}
+```bash
+python data/raw/dat.py
 ```
 
-Sortie :
+### 2. Préparer les données et entraîner
 
-```json
-{
-  "predicted_index": 0,
-  "predicted_label": "0",
-  "probabilities": {
-    "0": 0.92,
-    "1": 0.05,
-    "2": 0.03
-  }
-}
+```bash
+# Pipeline complet (prepare + train)
+python -m src.train
+
+# Forcer la régénération du preprocessing (ex. après changement de nv_max_samples)
+python -m src.train --force-prepare
+
+# Étapes séparées
+python -m src.train --prepare-only --force-prepare
+python -m src.train --train-only
+```
+
+### 3. Lancer l'API
+
+```bash
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+```
+
+### 4. Lancer l'interface Streamlit
+
+```bash
+streamlit run streamlit_app.py
+```
+
+### 5. Pipeline DVC
+
+```bash
+dvc repro
+```
+
+### 6. Docker
+
+```bash
+docker compose up --build
 ```
 
 ---
 
-## Interface utilisateur
+## Configuration clé (`params.yaml`)
 
-Une interface Streamlit permet :
+```yaml
+preprocess:
+  nv_max_samples: 3000          # Cap NV (null pour désactiver)
+  normalization_method: standard
+  imbalance_method: none        # none | smote | smote_tomek | undersample
 
-* Le chargement d’une image
-* L’extraction automatique des pixels
-* L’envoi des données à l’API
-* L’affichage du résultat de classification
+imbalance:
+  strategy: balanced_minority
+  rare_classes: [1, 2]
+  rare_class_boost: 1.2
 
----
-
-## Monitoring
-
-Un système de monitoring a été implémenté afin de suivre le comportement du modèle en production.
-
-Les indicateurs surveillés sont :
-
-* Latence des prédictions
-* Probabilité maximale
-* Classe prédite
-* Mean Absolute Drift
-
-
-Chaque prédiction est enregistrée dans des fichiers journaux JSONL.
+pca:
+  enabled: false                # true pour activer la PCA
+```
 
 ---
 
-## Intégration Continue
+## Choix techniques importants
 
-GitHub Actions est utilisé pour automatiser :
+### Pourquoi des modèles classiques (sans CNN) ?
 
-* L’analyse statique du code avec Ruff
-* L’entraînement automatique sur un mini dataset
-* L’exécution des tests unitaires avec Pytest
+Les pixels bruts en 28×28 perdent la structure spatiale 2D. Les modèles tabulaires (LR, RF, XGBoost) restent pertinents pour un prototype MLOps rapide, interprétable et léger, mais ont des **limites intrinsèques** pour distinguer des lésions visuellement proches (nv vs mel vs bcc). Le projet compense partiellement via le regroupement en 3 classes, l'undersampling NV, les class weights et la régularisation.
 
-Cette approche permet de garantir la qualité du code à chaque modification.
+### Prévention du data leakage
+
+| Opération | Moment | Fit sur |
+|-----------|--------|---------|
+| Undersampling NV | Avant split | Dataset complet (sélection aléatoire) |
+| StandardScaler | Après split | Train uniquement |
+| SMOTE | Après split | Train uniquement |
+| PCA | Après split | Train uniquement |
+| Class weights | Entraînement | Train uniquement |
+
+### Undersampling NV : placement dans le pipeline
+
+L'undersampling est appliqué **après le remapping des labels** (NV = classe 0) et **avant le split train/val/test**, afin que les trois jeux reflètent la même distribution et que l'évaluation reste cohérente.
 
 ---
 
-## Containerisation
+## Technologies
 
-Le projet est entièrement dockerisé afin de faciliter :
+Python · Scikit-learn · XGBoost · Pandas · NumPy · imbalanced-learn · FastAPI · Streamlit · MLflow · Optuna · DVC · Docker · GitHub Actions · Pytest · Ruff
 
-* Le déploiement
-* La reproductibilité
-* La portabilité
+---
 
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+---
+
+## Avertissement médical
+
+Ce projet est un **travail académique / de démonstration MLOps**. Il ne constitue en aucun cas un outil de diagnostic médical et ne doit pas être utilisé en conditions cliniques réelles.

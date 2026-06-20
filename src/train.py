@@ -15,8 +15,8 @@ import mlflow
 import mlflow.sklearn
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 from xgboost import XGBClassifier
 
 from src.class_weights import (
@@ -309,7 +309,7 @@ def train_all(processed_dir: Path | None = None) -> dict:
 
     _save_class_weights_artifact(class_weights, artifacts_dir)
 
-    model_names = ["logistic_regression", "random_forest", "xgboost"]
+    model_names = ["svm", "mlp", "xgboost"]
 
     run_ids = {}
 
@@ -349,11 +349,11 @@ def train_all(processed_dir: Path | None = None) -> dict:
                 else None
             )
 
-            if model_name == "logistic_regression":
-                joblib.dump(model, artifacts_dir / "logreg.joblib")
+            if model_name == "svm":
+                joblib.dump(model, artifacts_dir / "svm.joblib")
 
-            elif model_name == "random_forest":
-                joblib.dump(model, artifacts_dir / "rf.joblib")
+            elif model_name == "mlp":
+                joblib.dump(model, artifacts_dir / "mlp.joblib")
 
             elif model_name == "xgboost":
                 joblib.dump(model, artifacts_dir / "xgb.joblib")
@@ -519,28 +519,37 @@ def _fit_sklearn(
 
     seed = int(params["data"]["random_seed"])
 
-    if name == "logistic_regression":
-        model = LogisticRegression(
-            max_iter=1000,
-            C=float(t["logistic"]["C"]),
+    if name == "svm":
+        model = SVC(
+            C=float(t["svm"]["C"]),
+            kernel=t["svm"].get("kernel", "rbf"),
+            gamma=t["svm"].get("gamma", "scale"),
             class_weight=class_weights,
-            solver="saga",
+            probability=True,  # Nécessaire pour predict_proba
             random_state=seed,
+            max_iter=int(t["svm"].get("max_iter", -1)),
         )
 
         model.fit(X_train, y_train)
 
         return model
 
-    if name == "random_forest":
-        model = RandomForestClassifier(
-            n_estimators=int(t["rf"]["n_estimators"]),
-            max_depth=t["rf"].get("max_depth", 15),
-            min_samples_leaf=int(t["rf"].get("min_samples_leaf", 2)),
-            min_samples_split=int(t["rf"].get("min_samples_split", 5)),
-            class_weight=class_weights,
-            n_jobs=-1,
+    if name == "mlp":
+        batch_size_val = t["mlp"].get("batch_size", "auto")
+        if batch_size_val != "auto":
+            batch_size_val = int(batch_size_val)
+        
+        model = MLPClassifier(
+            hidden_layer_sizes=tuple(t["mlp"]["hidden_layer_sizes"]),
+            activation=t["mlp"].get("activation", "relu"),
+            solver=t["mlp"].get("solver", "adam"),
+            alpha=float(t["mlp"].get("alpha", 0.0001)),
+            batch_size=batch_size_val,
+            learning_rate=t["mlp"].get("learning_rate", "constant"),
+            learning_rate_init=float(t["mlp"].get("learning_rate_init", 0.001)),
+            max_iter=int(t["mlp"]["max_iter"]),
             random_state=seed,
+            n_iter_no_change=int(t["mlp"].get("n_iter_no_change", 10)),
         )
 
         model.fit(X_train, y_train)
@@ -590,19 +599,25 @@ def _save_class_weights_artifact(
 def _get_model_params(model_name: str, params: dict) -> dict:
     t = params["train"]
 
-    if model_name == "logistic_regression":
+    if model_name == "svm":
         return {
-            "C": float(t["logistic"]["C"]),
-            "max_iter": int(t["logistic"]["max_iter"]),
-            "solver": "saga",
+            "C": float(t["svm"]["C"]),
+            "kernel": t["svm"].get("kernel", "rbf"),
+            "gamma": t["svm"].get("gamma", "scale"),
+            "max_iter": int(t["svm"].get("max_iter", -1)),
         }
 
-    if model_name == "random_forest":
+    if model_name == "mlp":
         return {
-            "n_estimators": int(t["rf"]["n_estimators"]),
-            "max_depth": t["rf"].get("max_depth", 15),
-            "min_samples_leaf": int(t["rf"].get("min_samples_leaf", 2)),
-            "min_samples_split": int(t["rf"].get("min_samples_split", 5)),
+            "hidden_layer_sizes": t["mlp"]["hidden_layer_sizes"],
+            "activation": t["mlp"].get("activation", "relu"),
+            "solver": t["mlp"].get("solver", "adam"),
+            "alpha": float(t["mlp"].get("alpha", 0.0001)),
+            "batch_size": t["mlp"].get("batch_size", "auto"),
+            "learning_rate": t["mlp"].get("learning_rate", "constant"),
+            "learning_rate_init": float(t["mlp"].get("learning_rate_init", 0.001)),
+            "max_iter": int(t["mlp"]["max_iter"]),
+            "n_iter_no_change": int(t["mlp"].get("n_iter_no_change", 10)),
         }
 
     if model_name == "xgboost":
